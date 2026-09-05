@@ -147,11 +147,53 @@ class Grammar: #gramatica inteira
 
     def first_of_sequence(self, symbols: tuple[str, ...]) -> set[str]:
         """Calcule FIRST para uma sequência de zero ou mais símbolos."""
-        raise NotImplementedError("implemente FIRST de uma sequência")
+
+        resultado = set()
+
+        # se viear uma sequência vazia representa ε
+        if not symbols:
+            return {EPSILON}
+
+        for symbol in symbols:
+            # se não é não terminal, então é terminal
+            if symbol not in self.nonterminals: #v c tem o n terminal na lista
+                resultado.add(symbol)
+                return resultado
+
+            # symbol é não terminal
+            first_symbol = self.first[symbol]
+
+            # adiciona tudo menos ε
+            resultado.update(first_symbol - {EPSILON})
+
+            # se não pode desaparecer, não olhamos os próximos
+            if EPSILON not in first_symbol: # se e n estiver na lista first..... é true, entra no return,
+                # se for false, n retorna e vai para o prox simbolo, pois tem o e
+                return resultado
 
     def build_first(self) -> None:
         """Preencha self.first por iteração até um ponto fixo."""
-        raise NotImplementedError("implemente FIRST")
+    # FIRST começa vazio para todos os não terminais
+        self.first = self._empty_sets_by_nonterminal()
+
+        mudou = True
+
+        while mudou:
+            mudou = False
+
+            for production in self.productions:
+
+                lhs = production.lhs
+                rhs = production.rhs
+
+                first_rhs = self.first_of_sequence(rhs)
+
+                tamanho_antes = len(self.first[lhs])
+
+                self.first[lhs].update(first_rhs)
+
+                if len(self.first[lhs]) > tamanho_antes:
+                    mudou = True
 
     def build_follow(self) -> None:
         """Preencha self.follow; FIRST deve ter sido calculado antes."""
@@ -189,8 +231,10 @@ class Grammar: #gramatica inteira
         recursiva = []
         base = []
         for production in productions: #vai ver cada producao de cada vez
-            #A -> Ax ou Ay
+            #A -> Ax ou Ay          
             #primeiro pega Ax -> ve o primeiro elemento(A), se for igual coloca o resto na recursao, dps faz pro prox
+            
+            #depenenddo se tem recursao, colocar na lista recursiva, se n na base
             if production.rhs == ():
                 base.append(production.rhs)
             elif production.lhs == production.rhs[0] : #primeiro elemento
@@ -200,7 +244,13 @@ class Grammar: #gramatica inteira
 
         if recursiva == []:
             return False
-            #depenenddo se tem recursao, colocar na lista recursiva, se n na base
+        
+        #MWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWM
+
+        new_nao_terminal = self._fresh_nonterminal(nonterminal) #coloca ´ dps do n terminal que estava repetindo
+
+        self._insert_nonterminal_after(nonterminal, new_nao_terminal) #adiciona na gramatica
+
 
 
         
