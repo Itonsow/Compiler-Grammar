@@ -150,7 +150,7 @@ class Grammar: #gramatica inteira
 
         resultado = set()
 
-        # se viear uma sequência vazia representa ε
+        # se virar uma sequência vazia ε
         if not symbols:
             return {EPSILON}
 
@@ -170,6 +170,8 @@ class Grammar: #gramatica inteira
             if EPSILON not in first_symbol: # se e n estiver na lista first..... é true, entra no return,
                 # se for false, n retorna e vai para o prox simbolo, pois tem o e
                 return resultado
+        resultado.add(EPSILON) ## se chegar aqui, todos os símbolos podem desaparecer, então ε ta em first
+        return resultado
 
     def build_first(self) -> None:
         """Preencha self.first por iteração até um ponto fixo."""
@@ -201,7 +203,24 @@ class Grammar: #gramatica inteira
 
     def build_start(self) -> None:
         """Associe a cada produção seu conjunto START."""
-        raise NotImplementedError("implemente START")
+        self.start = {} # comeca vazio, depois vai preenchendo
+
+        for production in self.productions: #analisa uma producao por vez
+            first_da_producao = self.first_of_sequence(production.rhs) # pega o first da producao, que eh do lado direito
+
+            conjunto_start = set()
+
+            for simbolo in first_da_producao: #para cada simbolo do first da producao
+                if simbolo != EPSILON: #se for diferente de epsilon, adiciona no start
+                    conjunto_start.add(simbolo)
+
+            if EPSILON in first_da_producao: #se tiver epsilon no first da producao, adiciona o follow do lado esquerdo
+                follow_do_lado_esquerdo = self.follow[production.lhs]
+                for simbolo in follow_do_lado_esquerdo: # pra cada simbolo do follow do lado esquerdo, adiciona no start
+                    conjunto_start.add(simbolo)
+            self.start[production] = conjunto_start  #associa a producao ao start
+
+        #raise NotImplementedError("implemente START")
 
     def build_sets(self) -> None:
         self.build_first()
