@@ -175,7 +175,6 @@ class Grammar: #gramatica inteira
 
     def build_first(self) -> None:
         """Preencha self.first por iteração até um ponto fixo."""
-    # FIRST começa vazio para todos os não terminais
         self.first = self._empty_sets_by_nonterminal()
 
         mudou = True
@@ -197,10 +196,7 @@ class Grammar: #gramatica inteira
                 if len(self.first[lhs]) > tamanho_antes:
                     mudou = True
 
-    def build_follow(self) -> None:
-        """Preencha self.follow; FIRST deve ter sido calculado antes."""
-        raise NotImplementedError("implemente FOLLOW")
-
+    # def build_follow(self) -> None
     def build_start(self) -> None:
         """Associe a cada produção seu conjunto START."""
         self.start = {} # comeca vazio, depois vai preenchendo
@@ -269,12 +265,26 @@ class Grammar: #gramatica inteira
         new_nao_terminal = self._fresh_nonterminal(nonterminal) #coloca ´ dps do n terminal que estava repetindo
 
         self._insert_nonterminal_after(nonterminal, new_nao_terminal) #adiciona na gramatica
-
-
-
         
         """Elimine a recursão direta de um não terminal, se existir."""
-        raise NotImplementedError("implemente a remoção de recursão direta")
+        novas_bases = []
+
+        for beta in base:
+            novas_bases.append(beta + (new_nao_terminal,))
+
+        novas_recursivas = []
+
+        for alpha in recursiva:
+            novas_recursivas.append(alpha + (new_nao_terminal,))
+
+        # adiciona ε em A'
+        novas_recursivas.append(())
+
+
+        self._replace_productions(nonterminal, novas_bases)
+        self._replace_productions(new_nao_terminal, novas_recursivas)
+
+        return True
     
 
     def eliminate_all_direct_left_recursion(self) -> None:
