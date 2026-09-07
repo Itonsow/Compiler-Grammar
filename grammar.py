@@ -196,7 +196,49 @@ class Grammar: #gramatica inteira
                 if len(self.first[lhs]) > tamanho_antes:
                     mudou = True
 
-    # def build_follow(self) -> None
+    def build_follow(self) -> None:
+        """Preencha self.follow; FIRST deve ter sido calculado antes."""
+        self.follow = self._empty_sets_by_nonterminal()
+        self.follow[self.start_symbol].add(EOF) # adiciona EOF no follow do simbolo inicial
+        
+        mudou = True
+        
+        while mudou:
+            mudou = False
+        
+            for production in self.productions:
+                lado_esquerdo = production.lhs
+                lado_direito = production.rhs
+        
+                proximos = set(self.follow[lado_esquerdo])
+        
+                # comeca no ultimo simbolo da producao
+                posicao = len(lado_direito) - 1
+        
+                # percorre a producao de tras para frente
+                while posicao >= 0:
+                    simbolo = lado_direito[posicao]
+                    if simbolo in self.nonterminals: # se for nao terminal, atualiza o follow do simbolo
+                        tamanho_antes = len(self.follow[simbolo]) # guarda o tamanho do follow antes da alteracoa
+        
+                        self.follow[simbolo].update(proximos) # adiciona tudo de `proximos` ao follow do simbolo
+        
+                        if len(self.follow[simbolo]) > tamanho_antes: # se o tamanho do follow do simbolo aumentou, significa que teve uma mudança
+                            mudou = True
+        
+                        first_do_simbolo = self.first[simbolo] # busca o first do simbolo atual
+        
+                        if EPSILON in first_do_simbolo: # Se pode desaparecer, mantem os proximos atuais
+                            # e acrescenta o FIRST do simbolo sem ε
+                            proximos.update(first_do_simbolo - {EPSILON})
+                        else: # se o first do simbolo atual nao contem epsilon, significa que o simbolo nao pode desaparecer, entao os proximos sao apenas o first do simbolo atual
+                            proximos = first_do_simbolo - {EPSILON}
+                    else: # se for terminal, os proximos sao apenas o simbolo
+                        proximos = {simbolo}
+        
+                    # vai para o simbolo anterior
+                    posicao = posicao - 1
+
     def build_start(self) -> None:
         """Associe a cada produção seu conjunto START."""
         self.start = {} # comeca vazio, depois vai preenchendo
