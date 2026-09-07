@@ -5,15 +5,15 @@ from itertools import combinations
 from pathlib import Path
 
 
-EPSILON = "ε"
+EPSILON = "ε"  #constantes
 EOF = "EOF"
 
 
-def _common_prefix(
+def _common_prefix(  #rexebe duas sequencias de simbolos
     first: tuple[str, ...],
     second: tuple[str, ...],
 ) -> tuple[str, ...]:
-    prefix: list[str] = []
+    prefix: list[str] = []  #vai comparar, para ver qual é igual e vai retornar o simbolo igual
     for left, right in zip(first, second):
         if left != right:
             break
@@ -22,7 +22,13 @@ def _common_prefix(
 
 
 @dataclass(frozen=True)
-class Production:
+class Production: #producao individual da gramatica
+        #additive ::= additive PLUS multiplicative
+        # lhs = "additive"
+        # rhs = (
+        #     "additive",
+        #     "PLUS",
+        #     "multiplicative")
     lhs: str
     rhs: tuple[str, ...]
 
@@ -31,13 +37,13 @@ class Production:
         return f"{self.lhs} ::= {symbols}"
 
 
-class Grammar:
-    def __init__(self, productions: list[Production]):
+class Grammar: #gramatica inteira
+    def __init__(self, productions: list[Production]): #lista de producao
         if not productions:
             raise ValueError("a gramática deve possuir ao menos uma produção")
 
-        self.start_symbol = productions[0].lhs
-        self.nonterminals = list(
+        self.start_symbol = productions[0].lhs  #o primeiro n terminal encontrado é simbolo inicial
+        self.nonterminals = list(  #pega os simbolos que aparacerem no lado esquerdo (n terminais)
             dict.fromkeys(production.lhs for production in productions)
         )
         self._by_lhs: dict[str, list[Production]] = {
@@ -59,7 +65,8 @@ class Grammar:
         ]
 
     @property
-    def terminals(self) -> set[str]:
+    def terminals(self) -> set[str]: #descobre se é temrinal ou n
+        #se um símbolo aparece no RHS, mas não está na lista de não terminais, ele é terminal.
         nonterminals = set(self.nonterminals)
         return {
             symbol
@@ -84,7 +91,7 @@ class Grammar:
             if not lhs:
                 raise ValueError(f"linha {line_number}: lado esquerdo vazio")
 
-            for alternative in rhs.split("|"):
+            for alternative in rhs.split("|"): #separa as opcoes, cad aum vira um production diferente
                 alternative = alternative.strip()
                 if not alternative:
                     raise ValueError(
@@ -92,7 +99,7 @@ class Grammar:
                     )
                 symbols = tuple(alternative.split())
                 if symbols == (EPSILON,):
-                    symbols = ()
+                    symbols = () #epsilon vira um tupla vazia ()
                 elif EPSILON in symbols:
                     raise ValueError(
                         f"linha {line_number}: ε deve ser a alternativa completa"
@@ -105,18 +112,18 @@ class Grammar:
     def from_file(cls, path: str | Path) -> Grammar:
         return cls.from_text(Path(path).read_text(encoding="utf-8"))
 
-    def productions_for(self, nonterminal: str) -> list[Production]:
-        return list(self._by_lhs[nonterminal])
+    def productions_for(self, nonterminal: str) -> list[Production]: #qual producao o n terminal possui
+        return list(self._by_lhs[nonterminal]) 
 
     def _empty_sets_by_nonterminal(self) -> dict[str, set[str]]:
         return {nonterminal: set() for nonterminal in self.nonterminals}
 
-    def _invalidate_sets(self) -> None:
+    def _invalidate_sets(self) -> None: #apaga para poder ser usado dps, o First que ja foi calculado, n vale mais para o proximo
         self.first = {}
         self.follow = {}
         self.start = {}
 
-    def _insert_nonterminal_after(self, existing: str, new: str) -> None:
+    def _insert_nonterminal_after(self, existing: str, new: str) -> None: #ajude na remocao da recursao e na fatoracao
         position = self.nonterminals.index(existing) + 1
         self.nonterminals.insert(position, new)
         self._by_lhs[new] = []
@@ -131,7 +138,7 @@ class Grammar:
         ]
         self._invalidate_sets()
 
-    def _fresh_nonterminal(self, base: str) -> str:
+    def _fresh_nonterminal(self, base: str) -> str:  #cria novo nome, tipo A -> A´
         candidate = base + "'"
         occupied = set(self.nonterminals) | self.terminals
         while candidate in occupied:
@@ -140,28 +147,187 @@ class Grammar:
 
     def first_of_sequence(self, symbols: tuple[str, ...]) -> set[str]:
         """Calcule FIRST para uma sequência de zero ou mais símbolos."""
-        raise NotImplementedError("implemente FIRST de uma sequência")
+
+        resultado = set()
+
+        # se virar uma sequência vazia ε
+        if not symbols:
+            return {EPSILON}
+
+        for symbol in symbols:
+            # se não é não terminal, então é terminal
+            if symbol not in self.nonterminals: #v c tem o n terminal na lista
+                resultado.add(symbol)
+                return resultado
+
+            # symbol é não terminal
+            first_symbol = self.first[symbol]
+
+            # adiciona tudo menos ε
+            resultado.update(first_symbol - {EPSILON})
+
+            # se não pode desaparecer, não olhamos os próximos
+            if EPSILON not in first_symbol: # se e n estiver na lista first..... é true, entra no return,
+                # se for false, n retorna e vai para o prox simbolo, pois tem o e
+                return resultado
+        resultado.add(EPSILON) ## se chegar aqui, todos os símbolos podem desaparecer, então ε ta em first
+        return resultado
 
     def build_first(self) -> None:
         """Preencha self.first por iteração até um ponto fixo."""
-        raise NotImplementedError("implemente FIRST")
+        self.first = self._empty_sets_by_nonterminal()
+
+        mudou = True
+
+        while mudou:
+            mudou = False
+
+            for production in self.productions:
+
+                lhs = production.lhs
+                rhs = production.rhs
+
+                first_rhs = self.first_of_sequence(rhs)
+
+                tamanho_antes = len(self.first[lhs])
+
+                self.first[lhs].update(first_rhs)
+
+                if len(self.first[lhs]) > tamanho_antes:
+                    mudou = True
 
     def build_follow(self) -> None:
         """Preencha self.follow; FIRST deve ter sido calculado antes."""
-        raise NotImplementedError("implemente FOLLOW")
+        self.follow = self._empty_sets_by_nonterminal()
+        self.follow[self.start_symbol].add(EOF) # adiciona EOF no follow do simbolo inicial
+        
+        mudou = True
+        
+        while mudou:
+            mudou = False
+        
+            for production in self.productions:
+                lado_esquerdo = production.lhs
+                lado_direito = production.rhs
+        
+                proximos = set(self.follow[lado_esquerdo])
+        
+                # comeca no ultimo simbolo da producao
+                posicao = len(lado_direito) - 1
+        
+                # percorre a producao de tras para frente
+                while posicao >= 0:
+                    simbolo = lado_direito[posicao]
+                    if simbolo in self.nonterminals: # se for nao terminal, atualiza o follow do simbolo
+                        tamanho_antes = len(self.follow[simbolo]) # guarda o tamanho do follow antes da alteracoa
+        
+                        self.follow[simbolo].update(proximos) # adiciona tudo de `proximos` ao follow do simbolo
+        
+                        if len(self.follow[simbolo]) > tamanho_antes: # se o tamanho do follow do simbolo aumentou, significa que teve uma mudança
+                            mudou = True
+        
+                        first_do_simbolo = self.first[simbolo] # busca o first do simbolo atual
+        
+                        if EPSILON in first_do_simbolo: # Se pode desaparecer, mantem os proximos atuais
+                            # e acrescenta o FIRST do simbolo sem ε
+                            proximos.update(first_do_simbolo - {EPSILON})
+                        else: # se o first do simbolo atual nao contem epsilon, significa que o simbolo nao pode desaparecer, entao os proximos sao apenas o first do simbolo atual
+                            proximos = first_do_simbolo - {EPSILON}
+                    else: # se for terminal, os proximos sao apenas o simbolo
+                        proximos = {simbolo}
+        
+                    # vai para o simbolo anterior
+                    posicao = posicao - 1
 
     def build_start(self) -> None:
         """Associe a cada produção seu conjunto START."""
-        raise NotImplementedError("implemente START")
+        self.start = {} # comeca vazio, depois vai preenchendo
+
+        for production in self.productions: #analisa uma producao por vez
+            first_da_producao = self.first_of_sequence(production.rhs) # pega o first da producao, que eh do lado direito
+
+            conjunto_start = set()
+
+            for simbolo in first_da_producao: #para cada simbolo do first da producao
+                if simbolo != EPSILON: #se for diferente de epsilon, adiciona no start
+                    conjunto_start.add(simbolo)
+
+            if EPSILON in first_da_producao: #se tiver epsilon no first da producao, adiciona o follow do lado esquerdo
+                follow_do_lado_esquerdo = self.follow[production.lhs]
+                for simbolo in follow_do_lado_esquerdo: # pra cada simbolo do follow do lado esquerdo, adiciona no start
+                    conjunto_start.add(simbolo)
+            self.start[production] = conjunto_start  #associa a producao ao start
+
+        #raise NotImplementedError("implemente START")
 
     def build_sets(self) -> None:
         self.build_first()
         self.build_follow()
         self.build_start()
 
+    # def _insert_nonterminal_after(self, existing: str, new: str) -> None: #ajude na remocao da recursao e na fatoracao
+    #         position = self.nonterminals.index(existing) + 1
+    #         self.nonterminals.insert(position, new)
+    #         self._by_lhs[new] = []
+
+
+    # def _fresh_nonterminal(self, base: str) -> str:  #cria novo nome, tipo A -> A´
+    #         candidate = base + "'"
+    #         occupied = set(self.nonterminals) | self.terminals
+    #         while candidate in occupied:
+    #             candidate += "'"
+    #         return candidate
+
     def eliminate_direct_left_recursion(self, nonterminal: str) -> bool:
+        #_insert_nonterminal_after
+        #_fresh_nonterminal
+
+        #lhs: str
+        #rhs: tuple[str, ...]
+        productions = self.productions_for(nonterminal)
+        recursiva = []
+        base = []
+        for production in productions: #vai ver cada producao de cada vez
+            #A -> Ax ou Ay          
+            #primeiro pega Ax -> ve o primeiro elemento(A), se for igual coloca o resto na recursao, dps faz pro prox
+            
+            #depenenddo se tem recursao, colocar na lista recursiva, se n na base
+            if production.rhs == ():
+                base.append(production.rhs)
+            elif production.lhs == production.rhs[0] : #primeiro elemento
+                recursiva.append(production.rhs[1:])
+            else :
+                base.append(production.rhs)
+
+        if recursiva == []:
+            return False
+        
+        #MWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWMWM
+
+        new_nao_terminal = self._fresh_nonterminal(nonterminal) #coloca ´ dps do n terminal que estava repetindo
+
+        self._insert_nonterminal_after(nonterminal, new_nao_terminal) #adiciona na gramatica
+        
         """Elimine a recursão direta de um não terminal, se existir."""
-        raise NotImplementedError("implemente a remoção de recursão direta")
+        novas_bases = []
+
+        for beta in base:
+            novas_bases.append(beta + (new_nao_terminal,))
+
+        novas_recursivas = []
+
+        for alpha in recursiva:
+            novas_recursivas.append(alpha + (new_nao_terminal,))
+
+        # adiciona ε em A'
+        novas_recursivas.append(())
+
+
+        self._replace_productions(nonterminal, novas_bases)
+        self._replace_productions(new_nao_terminal, novas_recursivas)
+
+        return True
+    
 
     def eliminate_all_direct_left_recursion(self) -> None:
         for nonterminal in list(self.nonterminals):
